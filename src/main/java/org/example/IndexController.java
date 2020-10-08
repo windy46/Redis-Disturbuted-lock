@@ -7,9 +7,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
 @RestController
 public class IndexController {
 
@@ -24,13 +21,10 @@ public class IndexController {
 
         String lockKey = "lockKey";
 
-        String clientId = UUID.randomUUID().toString();
+        RLock redissonLock = redisson.getLock(lockKey);
 
         try {
-            Boolean result = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "windy", 30, TimeUnit.SECONDS);
-            if (!result) {
-                return "error_code";
-            }
+            redissonLock.lock();
             int stock = Integer.parseInt(stringRedisTemplate.opsForValue().get("stock"));
             if (stock > 0) {
                 int realStock = stock - 1;
@@ -40,9 +34,7 @@ public class IndexController {
                 System.out.println("扣减失败，库存不足");
             }
         } finally {
-            if(clientId.equals(stringRedisTemplate.opsForValue().get(lockKey))) {
-                stringRedisTemplate.delete(lockKey);
-            }
+           redissonLock.unlock();
         }
         return "end";
     }
